@@ -1,0 +1,37 @@
+
+########################## CREACION DEL ARCHIVO .EXE ##############################
+
+Para crear el archivo .exe que se ejecutara en los equipos de los clientes,
+es necesario correr el siguiente comando en el directorio donde se encuentre 
+el archivo fuente del programa en python:
+
+cxfreeze main.py --target-dir "jesuscristo" --exclude-module=config
+
+Donde "jesuscristo" es nuestro salvador, y el nombre del directorio donde se
+colocará el archivo .exe y todos los complementos necesarios; notese el 
+"exclude" sobre el modulo config.py, esto es necesario para que tal archivo 
+no se incluya en el .exe, ya que el mismo es sobreescrito a tiempo de 
+ejecucion por el programa. Al crearse el directorio "jesuscristo" con su 
+contenido, el archivo config.py debe ser agregado manualmente en tal directorio
+
+
+########################### ACERCA DEL PROGRAMADOR DE TAREAS ################################
+
+La forma mas sencilla para hacer que el archivo .exe creado, se ejecute cada
+cierta cantidad de tiempo en el equipo de un cliente, sin consumir gran 
+cantidad de recursos, y tomando en cuenta eventos como apagado inesperado del
+equipo, es mediante el programador de tareas de windows, a el momento de la
+creacion de este documento, esto solo se ha probado sobre windows 7, sin embargo
+se deduce que el proceso sea similar en otras versiones del sistema operativo.
+Para levantar el administrador de tareas, puede ejecutarse el siguiente comando
+mediante la ventana de ejecutar del sistema operativo o en una consola directamente
+
+Taskschd.msc
+
+Una vez hecho esto, debe agregarse una tarea al administrador mediante el archivo
+pythonloaderDB.xml que se encuentra en este mismo directorio, tal arhivo debe
+importarse dentro del administrador para agregar la tarea, y despues parametrizarse
+de manera correcta en base a la ubicacion del archivo en el equipo.
+
+################################### CHIABE CHIABE CHIABE CHIABE #################################
+

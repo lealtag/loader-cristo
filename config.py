@@ -1,0 +1,4 @@
+import datetime 
+local ={'rif': 'J-1234566000-8', 'name': 'Froyogur Centro Plaza', 'legal_name': 'Inversiones Centro Plaza C.A', 'address': 'AV. FRANCISCO DE MIRANDA, CENTRO COMERCIAL PLAZA', 'id': 'Froyo01'}
+configs ={'db': 'FroyoNew', 'password': 'serio', 'driver': '{SQL Server}', 'user': 'x_connector', 'server': 'localhost\\SQLEXPRESS'}
+params ={'log_error_file': 'errors.log', 'port': '3000', 'owners': '/api/owners.json', 'time_load': datetime.datetime(2013, 12, 27, 11, 28, 45, 514136), 'log_level': 'INFO', 'init': 0, 'products': '/api/products.json', 'no_id': ['01'], 'errors': '/api/logs.json', 'interval': '1800', 'url': 'http://192.168.0.150', 'log_file': 'loader.log', 'clients': '/api/clients.json', 'invoices': '/api/invoices.json', 'log_size': 2, 'time_init': datetime.datetime(2013, 12, 27, 17, 10, 45, 61556)}
