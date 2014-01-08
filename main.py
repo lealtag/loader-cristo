@@ -249,9 +249,9 @@ def get_invoices(cursor,id_local):
 
 def time_updater():
     if(config.params["init"]):
-        config.params["time_init"]= datetime.datetime.now()
+        config.params["time_init"] = datetime.datetime.now() - datetime.timedelta(minutes=15)
     else:
-        config.params["time_load"]=datetime.datetime.now()
+        config.params["time_load"] = datetime.datetime.now() - datetime.timedelta(minutes=15)
 
 def time_swap():
     if not (config.params["init"]):
@@ -261,7 +261,7 @@ def time_swap():
    
 def make_connection(config_db):
     try:
-        logging.debug("DATABASE LOADING PROCESS STARTED")
+        logging.debug("DATABASE CONNECTION OPENED")
         cnxn = pyodbc.connect('DRIVER='+config_db['driver']+';SERVER='+config_db['server']+';DATABASE='+config_db['db']+';UID='+config_db['user']+';PWD='+config_db['password'])
         cursor = cnxn.cursor()
 
@@ -273,7 +273,7 @@ def make_connection(config_db):
 def close_connection(cursor):
     try:
         cursor.close()
-        logging.debug('DATABASE LOADING PROCESS FINISHED')
+        logging.debug('DATABASE CONNECTION CLOSED')
 
     except pyodbc.Error as e:
         logging.error('COULD NOT CLOSE CONNECTION TO DATABASE SERVER, EXCEPTION : [%s]',e) 
@@ -296,7 +296,7 @@ def sender(url,port,endpoint,json):
         response = 0
     
     except urllib.error.HTTPError as e: 
-        logging.error("COULD NOT SEND OBJECT, CODE: %s REASON: %s, BODY: %s",e.getcode(),e.reason,e.read().decode('utf8','ignore'))
+        logging.debug("COULD NOT SEND OBJECT, CODE: %s REASON: %s, BODY: %s",e.getcode(),e.reason,e.read().decode('utf8','ignore'))
         response = e.getcode()
     except urllib.error.URLError as e: 
         logging.error("COULD NOT SEND OBJECT, REASON: %s",e.reason)
@@ -322,11 +322,7 @@ def setConfiguration():
 
 def setLogs():
 
-    # EN CASO DE ESTAR EN MODO DEBUG AGREGAR MAS INFORMACION AL LOG
-    if(config.params['log_level'] == 'DEBUG'):
-        formatStr = '[%(asctime)s # %(levelname)s # %(filename)s:%(funcName)s():%(lineno)d] %(message)s'
-    else:
-        formatStr = '[%(asctime)s # %(lineno)d # %(levelname)s] %(message)s'
+    formatStr = '[%(asctime)s # %(lineno)d # %(levelname)s] %(message)s'
         
     # SE CREA EL HANDLER QUE ESCRIBIRA LA INFORMACION DE FUNCIONAMIENTO DEL PROGRAMA, Y 
     # DE SER EL CASO LOS MENSAJES DE DEBUG
@@ -341,7 +337,7 @@ def setLogs():
     efh = logging.handlers.RotatingFileHandler(config.params['log_error_file'], maxBytes=size, backupCount=7)
     efh.setLevel(logging.ERROR)    
 
-    logging.basicConfig(level=config.params["log_level"],handlers=[fh,rh,efh],format=formatStr)
+    logging.basicConfig(level='DEBUG',handlers=[fh,rh,efh],format=formatStr)
    
 
 def main():
@@ -351,7 +347,10 @@ def main():
     # SE CONFIGURA Y ACTIVA EL SISTEMA DE LOGS
     setLogs()
 
-    logging.info("DATABASE LOADER STARTED")
+    if(config.params["init"]):
+        logging.info("DATABASE LOADER STARTED - INITIAL LOAD")
+    else:
+        logging.info("DATABASE LOADER STARTED - PIVOT [%s]",config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S"))
 
     # SE ESTABLECE LA CONEXION CON EL SERVIDOR DE BASE DE DATOS
     cursor=make_connection(config.configs)
@@ -404,7 +403,7 @@ def main():
         else:
             logging.info("SOMETHING WENT WRONG, THE LOADER WILL REPEAT THE PROCESS")
 
-    logging.info("DATABASE LOADER FINISHED")    
+    logging.info("DATABASE LOADER FINISHED - NEXT PIVOT [%s]",config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S"))    
 
 
 main()    
