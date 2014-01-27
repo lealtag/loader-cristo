@@ -46,7 +46,7 @@ class RESTHandler(logging.Handler):
             request = urllib.request.Request(self.host+':'+self.port+self.url, data=post_data, headers=headers)
             body = urllib.request.urlopen(request)
         except Exception as e:
-            print(e)
+            #print(e)
             f = open(config.params["log_error_file"]+'.dead', 'a')
             f.write(time.strftime('%d/%m/%Y %H:%M:%S')+' # CONNECTION ERROR # '+self.host+':'+self.port+self.url+'\n')
             f.close()
@@ -186,6 +186,8 @@ def get_invoices(cursor,id_local):
             invoice['number']= getattr(row,'number')
             invoice['date']= calendar.timegm(getattr(row,'date').utctimetuple())
             invoice['client']= getattr(row,'client')
+            if invoice['client'] in config.params['no_id'] :
+                        invoice['client']= id_local+'_NOID'
             invoice['subtotal']= getattr(row,'subtotal')
             invoice['tax']= getattr(row,'tax')
             invoice['total']= getattr(row,'total')
