@@ -114,12 +114,28 @@ def get_products(cursor,id_local):
 
 def get_clients(cursor,id_local,no_id):  
     try:
+
+        if config.params["init"]:
+            cursor.execute(" SELECT DISTINCT a.id3 as client from safact a where a.tipoFac='A' and a.signo=1 and a.fechaT < \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' ")
+        else:
+            cursor.execute(" SELECT DISTINCT a.id3 as client from safact a where a.tipoFac='A' and a.signo=1 and a.fechaT >= \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' ")
+
+        invoices = cursor.fetchall()
+
+        a = []
+        for row in invoices:
+
+            a.append(getattr(row,'client'))
+
+        query = '(' + ', '.join("'{0}'".format(w) for w in a) + ')'
+
+        
         q0_select = ['_id','name','address']
         if config.params["init"]:
-            cursor.execute("SELECT codClie as _id, Descrip as name, direc1 as address from saclie where fechaUV is not null AND fechaUV < \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\'")    
+            cursor.execute("SELECT codClie as _id, Descrip as name, direc1 as address from saclie where codClie in " + query)    
         else:
-            cursor.execute("SELECT codClie as _id, Descrip as name, direc1 as address from saclie where fechaUV is not null AND fechaUV >= \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\'")   
-    
+            cursor.execute("SELECT codClie as _id, Descrip as name, direc1 as address from saclie where codClie in " + query)    
+        
         rows = cursor.fetchall()
         #print(rows)
         #print(json.dump(rows))
@@ -382,20 +398,7 @@ def main():
         if data_0 != [] or data_1 != [] or data_2 != []:
             rollback = 1
 
-        #SE ENVIAN LOS RESULTADOS DE LAS CONSULTAS 
-        #response = sender(config.params["url"],config.params["port"],config.params["products"],data_0)
-        #if response == None:
-            #rollback = 1
-
-
-        #response = sender(config.params["url"],config.params["port"],config.params["clients"],data_1)
-        #if response == None:
-            #rollback = 1
-
-        #response = sender(config.params["url"],config.params["port"],config.params["invoices"],data_2)
-        #if response == None:
-            #rollback = 1
-
+        
         ## SI NO HUBO ERRORES MANDANDO LAS PETICIONES
         if not rollback:
             ## SE ALMACENA LA HORA PIVOTE PARA LA PROXIMA CONSULTA
