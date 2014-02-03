@@ -122,6 +122,12 @@ def get_clients(cursor,id_local,no_id):
 
         invoices = cursor.fetchall()
 
+        if len(invoices) < 1:
+
+            logging.info("NO CLIENT RECORDS WILL BE SENT DURING THIS LOAD PROCESS")
+            return []
+
+
         a = []
         for row in invoices:
 
