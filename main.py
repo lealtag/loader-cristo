@@ -509,7 +509,7 @@ def main():
         rollback = 0
 
         if data_0 != [] or data_1 != [] or data_2 != [] or data_3 != []:
-        rollback = 1
+            rollback = 1
 
         
         ## SI NO HUBO ERRORES MANDANDO LAS PETICIONES
