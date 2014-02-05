@@ -184,6 +184,7 @@ def get_clients(cursor,id_local,no_id):
 
 def get_invoices(cursor,id_local):
     
+    
     try:
         q0_select = ['number','date','client','subtotal','tax','total', 'product', 'quantity']
         if config.params["init"]:
@@ -196,7 +197,6 @@ def get_invoices(cursor,id_local):
 
             logging.info("%d INVOICE RECORDS WILL BE SENT DURING THIS LOAD PROCESS",len(rows_0))
 
-            #print(rows_0)
             #print(json.dump(rows_0))
             invoices = []
         
@@ -211,10 +211,10 @@ def get_invoices(cursor,id_local):
             invoice['subtotal']= getattr(row,'subtotal')
             invoice['tax']= getattr(row,'tax')
             invoice['total']= getattr(row,'total')
-            invoice['local']=invoice
+            invoice['local']=id_local
         
         
-            id_local['products']= [ {'pr':id_local+"_"+getattr(row,'product'),'qt':getattr(row,'quantity')} ]
+            invoice['products']= [ {'pr':id_local+"_"+getattr(row,'product'),'qt':getattr(row,'quantity')} ]
             
             num_fact=invoice['number']
             rows_0.pop(0)
@@ -225,7 +225,7 @@ def get_invoices(cursor,id_local):
                 if num_fact==getattr(rowitr,'number'):
                     invoice['products']= invoice['products'] +[ {'pr':id_local+'_'+getattr(rowitr,'product'),'qt':getattr(rowitr,'quantity')},]
                 else:
-                    
+                    #invoices = invoices + [invoice,]
                     package = json.dumps(invoice, cls=DecimalEncoder)                
                     response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
                     if not recover(response):
@@ -268,8 +268,6 @@ def get_invoices(cursor,id_local):
     except Exception as e:
         logging.error("SOMETHING WENT WRONG, EXCEPTION : [%s]",e)
         return None
-
-
 
 
 
