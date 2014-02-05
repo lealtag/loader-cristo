@@ -319,6 +319,7 @@ def get_del_invoices(cursor,id_local):
         
         rows = cursor.fetchall()
 
+        fail = []
         if len(rows) > 0 :
 
             logging.info("%d DELETED INVOICE RECORDS WILL BE SENT DURING THIS LOAD PROCESS",len(rows))
