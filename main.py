@@ -137,10 +137,8 @@ def get_clients(cursor,id_local,no_id):
 
         
         q0_select = ['_id','name','address']
-        if config.params["init"]:
-            cursor.execute("SELECT codClie as _id, Descrip as name, direc1 as address from saclie where codClie in " + query)    
-        else:
-            cursor.execute("SELECT codClie as _id, Descrip as name, direc1 as address from saclie where codClie in " + query)    
+       
+        cursor.execute("SELECT codClie as _id, Descrip as name, direc1 as address from saclie where codClie in " + query)    
         
         rows = cursor.fetchall()
         #print(rows)
@@ -213,10 +211,10 @@ def get_invoices(cursor,id_local):
             invoice['subtotal']= getattr(row,'subtotal')
             invoice['tax']= getattr(row,'tax')
             invoice['total']= getattr(row,'total')
-            invoice['local']=id_local
+            invoice['local']=invoice
         
         
-            invoice['products']= [ {'pr':id_local+"_"+getattr(row,'product'),'qt':getattr(row,'quantity')} ]
+            id_local['products']= [ {'pr':id_local+"_"+getattr(row,'product'),'qt':getattr(row,'quantity')} ]
             
             num_fact=invoice['number']
             rows_0.pop(0)
@@ -227,7 +225,7 @@ def get_invoices(cursor,id_local):
                 if num_fact==getattr(rowitr,'number'):
                     invoice['products']= invoice['products'] +[ {'pr':id_local+'_'+getattr(rowitr,'product'),'qt':getattr(rowitr,'quantity')},]
                 else:
-                    #invoices = invoices + [invoice,]
+                    
                     package = json.dumps(invoice, cls=DecimalEncoder)                
                     response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
                     if not recover(response):
@@ -270,6 +268,114 @@ def get_invoices(cursor,id_local):
     except Exception as e:
         logging.error("SOMETHING WENT WRONG, EXCEPTION : [%s]",e)
         return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+def get_del_invoices(cursor,id_local):
+    
+    try:
+        if config.params["init"]:
+            cursor.execute(" SELECT a.NumeroD as number, a.NumeroR as reference from safact a where a.tipoFac='A' and a.signo=1 and a.numeroR is not null and a.fechaT < \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' ")
+        else:
+            cursor.execute(" SELECT a.NumeroD as number, a.NumeroR as reference from safact a where a.tipoFac='A' and a.signo=1 and a.numeroR is not null and a.fechaT >= \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' ")
+        
+
+        invoices = cursor.fetchall()
+
+        if len(invoices) < 1:
+
+            logging.info("NO DELETED INVOICES RECORDS WILL BE SENT DURING THIS LOAD PROCESS")
+            return []
+
+
+        deletions = []
+        origins = []
+
+        for row in invoices:
+
+            deletions.append(getattr(row,'reference'))
+            origins.append(getattr(row,'number'))
+
+        queryD = '(' + ', '.join("'{0}'".format(w) for w in deletions) + ')'
+        queryO = '(' + ', '.join("'{0}'".format(w) for w in origins) + ')'
+
+
+        q0_select = ['number','deleted','date','client','subtotal','tax','total']
+        
+        
+        cursor.execute("SELECT Numerod as number, NumeroR as deleted, fechaT as date, id3 as client, Monto as subtotal, mtoTax as tax, mtoTotal as total from safact where numeroR in " + queryO + " and numeroD in " + queryD + " and TipoFac='B'")    
+        
+        rows = cursor.fetchall()
+
+        if len(rows) > 0 :
+
+            logging.info("%d DELETED INVOICE RECORDS WILL BE SENT DURING THIS LOAD PROCESS",len(rows))
+
+            for row in rows:
+
+                invoices = {}
+            
+                invoices['number']= getattr(row,'number')
+                invoices['deleted']= getattr(row,'deleted')
+                invoices['date']= calendar.timegm(getattr(row,'date').utctimetuple())
+                invoices['client']= getattr(row,'client')
+                if invoices['client'] in config.params['no_id']:
+                    invoices['client']= id_local+'_NOID'    
+                invoices['subtotal']= getattr(row,'subtotal')
+                invoices['tax']= getattr(row,'tax')
+                invoices['total']= getattr(row,'total')
+                invoices['local']=id_local
+
+                
+                #print(invoices)
+              
+                package = json.dumps(invoices, cls=DecimalEncoder)                
+                response = sender(config.params["url"],config.params["port"],config.params["cancelinvoices"],package)
+
+            if not recover(response):
+                fail.append(invoice['number'])
+            #to_json={}
+            #to_json['invoices']=invoices
+        
+            return fail
+            #return(json.dumps(to_json, cls=DecimalEncoder))
+        else:
+            logging.info("NO DELETED INVOICES RECORDS WILL BE SENT DURING THIS LOAD PROCESS - WARNING, THIS MESSAGE SHOULDNT APPEAR")
+
+            return []
+    except pyodbc.Error as e:
+        logging.error("COULD NOT EXECUTE QUERY TO GET INVOICES, EXCEPTION : [%s]",e)
+        return None      
+    except Exception as e:
+        logging.error("SOMETHING WENT WRONG, EXCEPTION : [%s]",e)
+        return None
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 def time_updater():
     if(config.params["init"]):
@@ -389,6 +495,7 @@ def main():
         data_0 = get_products(cursor,config.local['id'])
         data_1 = get_clients(cursor,config.local['id'],config.params['no_id'])
         data_2 = get_invoices(cursor,config.local['id'])
+        data_3 = get_del_invoices(cursor,config.local['id'])
         #print(data_0)
         #print(data_1)
         #print(data_2)
@@ -401,8 +508,8 @@ def main():
         # VARIABLE PARA REPETIR EL STRING
         rollback = 0
 
-        if data_0 != [] or data_1 != [] or data_2 != []:
-            rollback = 1
+        if data_0 != [] or data_1 != [] or data_2 != [] or data_3 != []:
+        rollback = 1
 
         
         ## SI NO HUBO ERRORES MANDANDO LAS PETICIONES
