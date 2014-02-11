@@ -50,15 +50,15 @@ class RESTHandler(logging.Handler):
             f = open(config.params["log_error_file"]+'.dead', 'a')
             f.write(time.strftime('%d/%m/%Y %H:%M:%S')+' # CONNECTION ERROR # '+self.host+':'+self.port+self.url+'\n')
             f.close()
-#            
+
+
+
+
 
 def recover(code):
     if code > 0 and code != 422:
         return False
     return True
-
-    
-
 
 def get_products(cursor,id_local):
     try:
@@ -82,25 +82,30 @@ def get_products(cursor,id_local):
                 product = {}
         
                 for i in range(len(q0_select)):
-                    #print(type(getattr(row,q0_select[i])))
+                    
                     product[q0_select[i]] = getattr(row,q0_select[i])
                 
                 product['_id']=id_local+'_'+product['code']
                 product['local']=id_local
         
-                #products = products + [product,]
                 package = json.dumps(product, cls=DecimalEncoder)                
                 response = sender(config.params["url"],config.params["port"],config.params["products"],package)
+                
+                if(response == 600):
+
+                    ri = 0
+                    while(ri < 2 and response == 600):
+
+                        response = sender(config.params["url"],config.params["port"],config.params["products"],package)
+                        ri += 1
+
                 if not recover(response):
+
                     fail.append(product['_id'])
                 
             return fail
 
-            #to_json={}
-            #to_json['products']=products
             
-        
-            #return(json.dumps(to_json, cls=DecimalEncoder))
         else:
 
             logging.info("NO PRODUCT RECORDS WILL BE SENT DURING THIS LOAD PROCESS ")
@@ -141,8 +146,6 @@ def get_clients(cursor,id_local,no_id):
         cursor.execute("SELECT codClie as _id, Descrip as name, direc1 as address from saclie where codClie in " + query)    
         
         rows = cursor.fetchall()
-        #print(rows)
-        #print(json.dump(rows))
         if len(rows) > 0 :
 
             logging.info("%d CLIENT RECORDS WILL BE SENT DURING THIS LOAD PROCESS",len(rows))
@@ -152,7 +155,6 @@ def get_clients(cursor,id_local,no_id):
                 client = {}
         
                 for i in range(len(q0_select)):
-                    #print(type(getattr(row,q0_select[i])))
                     client[q0_select[i]] = getattr(row,q0_select[i])
                 
                 for name in no_id:
@@ -161,16 +163,23 @@ def get_clients(cursor,id_local,no_id):
                         client['_id']=id_local+'_NOID'
                 
         
-                #clients = clients + [client,]
                 package = json.dumps(client, cls=DecimalEncoder)                
                 response = sender(config.params["url"],config.params["port"],config.params["clients"],package)
+
+                if(response == 600):
+
+                    ri = 0
+                    while(ri < 2 and response == 600):
+
+                        response = sender(config.params["url"],config.params["port"],config.params["clients"],package)
+                        ri += 1
+
                 if not recover(response):
                     fail.append(client['_id'])
-            #to_json={}
-            #to_json['clients']=clients
+            
             return fail
             
-            #return(json.dumps(to_json, cls=DecimalEncoder))
+            
         else:
             logging.info("NO CLIENT RECORDS WILL BE SENT DURING THIS LOAD PROCESS")
 
@@ -188,16 +197,15 @@ def get_invoices(cursor,id_local):
     try:
         q0_select = ['number','date','client','subtotal','tax','total', 'product', 'quantity']
         if config.params["init"]:
-            cursor.execute(" SELECT a.Numerod as number, a.fechaT as date, a.id3 as client, a.monto as subtotal, a.mtoTax as tax, a.mtoTotal as total, b.codItem as product, count(b.codItem) as quantity from safact a , saitemfac b where a.tipoFac='A' and a.signo=1 and a.numeroD=b.numeroD and a.fechaT < \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' group by a.Numerod, a.fechaT, a.id3, a.monto, a.mtoTax, a.mtoTotal, b.codItem order by a.Numerod")
+            cursor.execute(" SELECT a.Numerod as number, a.fechaT as date, a.id3 as client, a.monto as subtotal, a.mtoTax as tax, a.mtoTotal as total, b.codItem as product, count(b.codItem) as quantity, sum(b.totalItem) as tot from safact a , saitemfac b where a.tipoFac='A' and a.signo=1 and a.numeroD=b.numeroD and a.fechaT < \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' group by a.Numerod, a.fechaT, a.id3, a.monto, a.mtoTax, a.mtoTotal, b.codItem order by a.Numerod")
         else:
-            cursor.execute(" SELECT a.Numerod as number, a.fechaT as date, a.id3 as client, a.monto as subtotal, a.mtoTax as tax, a.mtoTotal as total, b.codItem as product, count(b.codItem) as quantity from safact a , saitemfac b where a.tipoFac='A' and a.signo=1 and a.numeroD=b.numeroD and a.fechaT >= \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' group by a.Numerod, a.fechaT, a.id3, a.monto, a.mtoTax, a.mtoTotal, b.codItem order by a.Numerod")
+            cursor.execute(" SELECT a.Numerod as number, a.fechaT as date, a.id3 as client, a.monto as subtotal, a.mtoTax as tax, a.mtoTotal as total, b.codItem as product, count(b.codItem) as quantity, sum(b.totalItem) as tot from safact a , saitemfac b where a.tipoFac='A' and a.signo=1 and a.numeroD=b.numeroD and a.fechaT >= \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' group by a.Numerod, a.fechaT, a.id3, a.monto, a.mtoTax, a.mtoTotal, b.codItem order by a.Numerod")
         
         rows_0 = cursor.fetchall()
         if len(rows_0) > 0 :
 
             logging.info("%d INVOICE RECORDS WILL BE SENT DURING THIS LOAD PROCESS",len(rows_0))
 
-            #print(json.dump(rows_0))
             invoices = []
         
             row=rows_0[0]
@@ -214,20 +222,32 @@ def get_invoices(cursor,id_local):
             invoice['local']=id_local
         
         
-            invoice['products']= [ {'pr':id_local+"_"+getattr(row,'product'),'qt':getattr(row,'quantity')} ]
-            
+            invoice['products']= [ {'pr':id_local+"_"+getattr(row,'product'),'qt':getattr(row,'quantity'),'tot':getattr(row,'tot')} ]
             num_fact=invoice['number']
+            
             rows_0.pop(0)
+
+
            
             fail=[]
             for rowitr in rows_0:
-              
+
+               
                 if num_fact==getattr(rowitr,'number'):
-                    invoice['products']= invoice['products'] +[ {'pr':id_local+'_'+getattr(rowitr,'product'),'qt':getattr(rowitr,'quantity')},]
+                    invoice['products']= invoice['products'] +[ {'pr':id_local+'_'+getattr(rowitr,'product'),'qt':getattr(rowitr,'quantity'),'tot':getattr(rowitr,'tot')},]
                 else:
-                    #invoices = invoices + [invoice,]
+                    
                     package = json.dumps(invoice, cls=DecimalEncoder)                
                     response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
+                    
+                    if(response == 600):
+
+                        ri = 0
+                        while(ri < 2 and response == 600):
+
+                            response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
+                            ri += 1
+
                     if not recover(response):
                         fail.append(invoice['number'])
 
@@ -246,18 +266,25 @@ def get_invoices(cursor,id_local):
                     invoice['local']=id_local
 
         
-                    invoice['products']= [ {'pr':id_local+"_"+getattr(rowitr,'product'),'qt':getattr(rowitr,'quantity')} ]
+                    invoice['products']= [ {'pr':id_local+"_"+getattr(rowitr,'product'),'qt':getattr(rowitr,'quantity'),'tot':getattr(rowitr,'tot')} ]
                           
-            #invoices = invoices + [invoice,]
-            package = json.dumps(invoice, cls=DecimalEncoder)                
+            package = json.dumps(invoice, cls=DecimalEncoder)  
             response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
+            
+            if(response == 600):
+
+                ri = 0
+                while(ri < 2 and response == 600):
+
+                    response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
+                    ri += 1
+
             if not recover(response):
                 fail.append(invoice['number'])
-            #to_json={}
-            #to_json['invoices']=invoices
-        
+
+            
             return fail
-            #return(json.dumps(to_json, cls=DecimalEncoder))
+            
         else:
             logging.info("NO INVOICE RECORDS WILL BE SENT DURING THIS LOAD PROCESS")
 
@@ -268,18 +295,6 @@ def get_invoices(cursor,id_local):
     except Exception as e:
         logging.error("SOMETHING WENT WRONG, EXCEPTION : [%s]",e)
         return None
-
-
-
-
-
-
-
-
-
-
-
-
 
 def get_del_invoices(cursor,id_local):
     
@@ -337,19 +352,24 @@ def get_del_invoices(cursor,id_local):
                 invoices['total']= getattr(row,'total')
                 invoices['local']=id_local
 
-                
-                #print(invoices)
-              
                 package = json.dumps(invoices, cls=DecimalEncoder)                
                 response = sender(config.params["url"],config.params["port"],config.params["cancelinvoices"],package)
 
-            if not recover(response):
-                fail.append(invoice['number'])
-            #to_json={}
-            #to_json['invoices']=invoices
-        
+
+                if(response == 600):
+
+                    ri = 0
+                    while(ri < 2 and response == 600):
+
+                        response = sender(config.params["url"],config.params["port"],config.params["cancelinvoices"],package)
+                        ri += 1
+
+                if not recover(response):
+                        fail.append(invoices['number'])
+
+                
             return fail
-            #return(json.dumps(to_json, cls=DecimalEncoder))
+            
         else:
             logging.info("NO DELETED INVOICES RECORDS WILL BE SENT DURING THIS LOAD PROCESS - WARNING, THIS MESSAGE SHOULDNT APPEAR")
 
@@ -360,21 +380,6 @@ def get_del_invoices(cursor,id_local):
     except Exception as e:
         logging.error("SOMETHING WENT WRONG, EXCEPTION : [%s]",e)
         return None
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 
 def time_updater():
     if(config.params["init"]):
@@ -437,7 +442,6 @@ def sender(url,port,endpoint,json):
     
     return response
 
-
 def setConfiguration():
 
     f= open('config.py','w')
@@ -447,7 +451,6 @@ def setConfiguration():
     f.write('params =' +str(config.params)+'\n')
     f.close()
     logging.debug("CONFIGURATION WAS SAVED")
-
 
 def setLogs():
 
@@ -468,7 +471,6 @@ def setLogs():
 
     logging.basicConfig(level='DEBUG',handlers=[fh,rh,efh],format=formatStr)
    
-
 def main():
     
     
