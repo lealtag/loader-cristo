@@ -1,4 +1,4 @@
-import  json,signal, pyodbc, decimal, calendar, datetime, config, urllib.request, urllib.error, sys, logging, logging.handlers, time
+import  json,signal, pyodbc, local, decimal, calendar, datetime, config, urllib.request, urllib.error, sys, logging, logging.handlers, time
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, o):
@@ -38,7 +38,7 @@ class RESTHandler(logging.Handler):
 
         """
         try:
-            data = {'level': record.levelname, 'message': record.getMessage(), "date":record.asctime, "local":config.local['name']}
+            data = {'level': record.levelname, 'message': record.getMessage(), "date":record.asctime, "local":local.local['name']}
             jsonS = json.dumps(data, cls=DecimalEncoder)
             headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
             post_data = jsonS.encode('utf-8')
@@ -446,8 +446,8 @@ def setConfiguration():
 
     f= open('config.py','w')
     f.write('import datetime \n')
-    f.write('local ='+str(config.local)+'\n')
-    f.write('configs ='+str(config.configs)+'\n')
+    f.write('local ='+str(local.local)+'\n')
+    f.write('configs ='+str(local.configs)+'\n')
     f.write('params =' +str(config.params)+'\n')
     f.close()
     logging.debug("CONFIGURATION WAS SAVED")
@@ -484,7 +484,7 @@ def main():
         logging.info("DATABASE LOADER STARTED - PIVOT [%s]",config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S"))
 
     # SE ESTABLECE LA CONEXION CON EL SERVIDOR DE BASE DE DATOS
-    cursor=make_connection(config.configs)
+    cursor=make_connection(local.configs)
 
     # EN CASO DE QUE LA CONEXION CON LA BD SEA EXITOSA
     if not cursor == None:
@@ -493,10 +493,10 @@ def main():
         time_updater()
 
         # SE EJECUTAN LAS CONSULTAS CORRESPONDIENTES
-        data_0 = get_products(cursor,config.local['id'])
-        data_1 = get_clients(cursor,config.local['id'],config.params['no_id'])
-        data_2 = get_invoices(cursor,config.local['id'])
-        data_3 = get_del_invoices(cursor,config.local['id'])
+        data_0 = get_products(cursor,local.local['id'])
+        data_1 = get_clients(cursor,local.local['id'],config.params['no_id'])
+        data_2 = get_invoices(cursor,local.local['id'])
+        data_3 = get_del_invoices(cursor,local.local['id'])
         #print(data_0)
         #print(data_1)
         #print(data_2)
