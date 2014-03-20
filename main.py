@@ -196,10 +196,13 @@ def get_invoices(cursor,id_local):
     
     try:
         q0_select = ['number','date','client','subtotal','tax','total', 'product', 'quantity']
+      
+        # SE AGREGO EL PEO DEL DESCUENTO, PERO NO SE ESTA DISCRIMINANDO ESTE TIPO DE FACTURAS SOBRE LAS DEMAS
+        # SE AGREGO LA CANTIDAD DE SAINT PARA DISCRIMINAR UNITARIA  
         if config.params["init"]:
-            cursor.execute(" SELECT a.Numerod as number, a.fechaT as date, a.id3 as client, a.monto as subtotal, a.mtoTax as tax, a.mtoTotal as total, b.codItem as product, count(b.codItem) as quantity, sum(b.totalItem) as tot from safact a , saitemfac b where a.tipoFac='A' and a.signo=1 and a.numeroD=b.numeroD and a.fechaT < \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' group by a.Numerod, a.fechaT, a.id3, a.monto, a.mtoTax, a.mtoTotal, b.codItem order by a.Numerod")
+            cursor.execute(" SELECT a.Numerod as number, a.fechaT as date, a.id3 as client, (a.monto-a.descto1) as subtotal, a.mtoTax as tax, a.contado as total, b.codItem as product, count(b.codItem) as quantity, sum(b.cantidad) as qtPerItem, sum(b.totalItem) as tot from safact a , saitemfac b where a.tipoFac='A' and a.signo=1 and a.numeroD=b.numeroD and a.fechaT < \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' group by a.Numerod, a.fechaT, a.id3, a.monto, a.mtoTax, a.contado, a.descto1, b.codItem order by a.Numerod")
         else:
-            cursor.execute(" SELECT a.Numerod as number, a.fechaT as date, a.id3 as client, a.monto as subtotal, a.mtoTax as tax, a.mtoTotal as total, b.codItem as product, count(b.codItem) as quantity, sum(b.totalItem) as tot from safact a , saitemfac b where a.tipoFac='A' and a.signo=1 and a.numeroD=b.numeroD and a.fechaT >= \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' group by a.Numerod, a.fechaT, a.id3, a.monto, a.mtoTax, a.mtoTotal, b.codItem order by a.Numerod")
+            cursor.execute(" SELECT a.Numerod as number, a.fechaT as date, a.id3 as client, (a.monto-a.descto1) as subtotal, a.mtoTax as tax, a.contado as total, b.codItem as product, count(b.codItem) as quantity, sum(b.cantidad) as qtPerItem, sum(b.totalItem) as tot from safact a , saitemfac b where a.tipoFac='A' and a.signo=1 and a.numeroD=b.numeroD and a.fechaT >= \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' group by a.Numerod, a.fechaT, a.id3, a.monto, a.mtoTax, a.contado, a.descto1, b.codItem order by a.Numerod")
         
         rows_0 = cursor.fetchall()
         if len(rows_0) > 0 :
@@ -222,7 +225,15 @@ def get_invoices(cursor,id_local):
             invoice['local']=id_local
         
         
-            invoice['products']= [ {'pr':id_local+"_"+getattr(row,'product'),'qt':getattr(row,'quantity'),'tot':getattr(row,'tot')} ]
+            product_id = getattr(row,'product')
+            # IF CHIMBO PARA LOS HELADOS
+            #print(product_id)
+            if id_local == "Froyo01" and product_id == '01':
+                invoice['products']= [ {'pr':id_local+"_"+product_id,'qt':getattr(row,'quantity'),'tot':getattr(row,'tot')} ]
+            else:
+                rqt = getattr(row,'qtPerItem')
+                invoice['products']= [ {'pr':id_local+"_"+product_id,'qt':rqt,'tot':getattr(row,'tot')} ]
+
             num_fact=invoice['number']
             
             rows_0.pop(0)
@@ -234,7 +245,15 @@ def get_invoices(cursor,id_local):
 
                
                 if num_fact==getattr(rowitr,'number'):
-                    invoice['products']= invoice['products'] +[ {'pr':id_local+'_'+getattr(rowitr,'product'),'qt':getattr(rowitr,'quantity'),'tot':getattr(rowitr,'tot')},]
+                    product_id = getattr(rowitr,'product')
+                    # IF CHIMBO PARA LOS HELADOS
+                    if id_local == "Froyo01" and product_id == '01':
+                        invoice['products']= invoice['products'] + [ {'pr':id_local+"_"+product_id,'qt':getattr(rowitr,'quantity'),'tot':getattr(rowitr,'tot')} ]
+                    else:
+                        rqt = getattr(rowitr,'qtPerItem')
+                        invoice['products']= invoice['products'] + [ {'pr':id_local+"_"+product_id,'qt':rqt,'tot':getattr(rowitr,'tot')} ]
+
+                    
                 else:
                     
                     package = json.dumps(invoice, cls=DecimalEncoder)                
@@ -265,8 +284,14 @@ def get_invoices(cursor,id_local):
                     invoice['total']= getattr(rowitr,'total')
                     invoice['local']=id_local
 
-        
-                    invoice['products']= [ {'pr':id_local+"_"+getattr(rowitr,'product'),'qt':getattr(rowitr,'quantity'),'tot':getattr(rowitr,'tot')} ]
+                    product_id = getattr(rowitr,'product')
+                    # IF CHIMBO PARA LOS HELADOS
+                    if id_local == "Froyo01" and product_id == '01':
+                        invoice['products']= [ {'pr':id_local+"_"+product_id,'qt':getattr(rowitr,'quantity'),'tot':getattr(rowitr,'tot')} ]
+                    else:
+                        rqt = getattr(rowitr,'qtPerItem')
+                        invoice['products']= [ {'pr':id_local+"_"+product_id,'qt':rqt,'tot':getattr(rowitr,'tot')} ]
+                    
                           
             package = json.dumps(invoice, cls=DecimalEncoder)  
             response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
