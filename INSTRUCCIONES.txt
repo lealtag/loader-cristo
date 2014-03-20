@@ -5,7 +5,7 @@ Para crear el archivo .exe que se ejecutara en los equipos de los clientes,
 es necesario correr el siguiente comando en el directorio donde se encuentre 
 el archivo fuente del programa en python:
 
-cxfreeze main.py --target-dir "jesuscristo" --exclude-module=config
+cxfreeze main.py --target-dir "jesuscristo" --exclude-module=config,local
 
 Donde "jesuscristo" es nuestro salvador, y el nombre del directorio donde se
 colocará el archivo .exe y todos los complementos necesarios; notese el 
