@@ -1,4 +1,7 @@
-import  json,signal, pyodbc, local, decimal, calendar, datetime, config, urllib.request, urllib.error, sys, logging, logging.handlers, time
+import  pprint,math,json,signal, pyodbc, local, decimal, calendar, datetime, config, urllib.request, urllib.error, sys, logging, logging.handlers, time
+
+username = "loaderfroyo01@lealtag.com"
+password = "1234"
 
 class DecimalEncoder(json.JSONEncoder):
     def default(self, o):
@@ -41,6 +44,8 @@ class RESTHandler(logging.Handler):
             data = {'level': record.levelname, 'message': record.getMessage(), "date":record.asctime, "local":local.local['name']}
             jsonS = json.dumps(data, cls=DecimalEncoder)
             headers = {'Content-type': 'application/json', 'Accept': 'application/json'}
+            headersD = {'X-COIN':'h4kun4m4t4t4k4p15c4bul','ID':local.local['id']}
+            headers.update(headersD)
             post_data = jsonS.encode('utf-8')
             #print(jsonS)
             request = urllib.request.Request(self.host+':'+self.port+self.url, data=post_data, headers=headers)
@@ -53,6 +58,8 @@ class RESTHandler(logging.Handler):
 
 
 
+def update_progress(progress,qt,tot):
+    logging.debug("Progreso - "+str(qt)+"/"+str(tot)+" elementos enviados ("+str(progress)+"%)")
 
 
 def recover(code):
@@ -60,7 +67,7 @@ def recover(code):
         return False
     return True
 
-def get_products(cursor,id_local):
+def get_products(cursor,id_local,auth):
     try:
         q0_select = ['code','description','price']
         if config.params["init"]:
@@ -74,7 +81,13 @@ def get_products(cursor,id_local):
         #print(json.dump(rows))
         if len(rows) > 0:
 
-            logging.info("%d PRODUCT RECORDS WILL BE SENT DURING THIS LOAD PROCESS",len(rows))
+            n = len(rows)
+            qt = 0
+            pivote = 1
+            porcentaje = (100 // 20) * pivote
+            progreso = math.ceil(n / 20) * pivote
+
+            logging.info("%d PRODUCT RECORDS WILL BE SENT DURING THIS LOAD PROCESS",n)
 
             fail = []
 
@@ -89,19 +102,26 @@ def get_products(cursor,id_local):
                 product['local']=id_local
         
                 package = json.dumps(product, cls=DecimalEncoder)                
-                response = sender(config.params["url"],config.params["port"],config.params["products"],package)
+                response = sender(config.params["url"],config.params["port"],config.params["products"],package,auth)
                 
                 if(response == 600):
 
                     ri = 0
                     while(ri < 2 and response == 600):
 
-                        response = sender(config.params["url"],config.params["port"],config.params["products"],package)
+                        response = sender(config.params["url"],config.params["port"],config.params["products"],package,auth)
                         ri += 1
 
                 if not recover(response):
 
                     fail.append(product['_id'])
+
+                qt += 1
+                if qt == progreso:
+                    update_progress(porcentaje, qt,n)
+                    pivote += 1
+                    porcentaje = (100 // 20) * pivote
+                    progreso = math.ceil(n / 20) * pivote
                 
             return fail
 
@@ -117,7 +137,7 @@ def get_products(cursor,id_local):
         logging.error("SOMETHING WENT WRONG, EXCEPTION : [%s]",e)
         return None
 
-def get_clients(cursor,id_local,no_id):  
+def get_clients(cursor,id_local,no_id,auth):  
     try:
 
         if config.params["init"]:
@@ -148,7 +168,13 @@ def get_clients(cursor,id_local,no_id):
         rows = cursor.fetchall()
         if len(rows) > 0 :
 
-            logging.info("%d CLIENT RECORDS WILL BE SENT DURING THIS LOAD PROCESS",len(rows))
+            n = len(rows)
+            qt = 0
+            pivote = 1
+            porcentaje = (100 // 20) * pivote
+            progreso = math.ceil(n / 20) * pivote
+
+            logging.info("%d CLIENT RECORDS WILL BE SENT DURING THIS LOAD PROCESS",n)
 
             fail = []
             for row in rows:
@@ -164,18 +190,26 @@ def get_clients(cursor,id_local,no_id):
                 
         
                 package = json.dumps(client, cls=DecimalEncoder)                
-                response = sender(config.params["url"],config.params["port"],config.params["clients"],package)
+                response = sender(config.params["url"],config.params["port"],config.params["clients"],package,auth)
 
                 if(response == 600):
 
                     ri = 0
                     while(ri < 2 and response == 600):
 
-                        response = sender(config.params["url"],config.params["port"],config.params["clients"],package)
+                        response = sender(config.params["url"],config.params["port"],config.params["clients"],package,auth)
                         ri += 1
 
                 if not recover(response):
                     fail.append(client['_id'])
+
+                qt += 1
+                if qt == progreso:
+                    update_progress(porcentaje, qt,n)
+                    pivote += 1
+                    porcentaje = (100 // 20) * pivote
+                    progreso = math.ceil(n / 20) * pivote
+
             
             return fail
             
@@ -191,14 +225,14 @@ def get_clients(cursor,id_local,no_id):
         logging.error("SOMETHING WENT WRONG, EXCEPTION : [%s]",e)
         return None
 
-def get_invoices(cursor,id_local):
+def get_invoices(cursor,id_local,auth):
     
     
     try:
         q0_select = ['number','date','client','subtotal','tax','total', 'product', 'quantity']
       
         # SE AGREGO EL PEO DEL DESCUENTO, PERO NO SE ESTA DISCRIMINANDO ESTE TIPO DE FACTURAS SOBRE LAS DEMAS
-        # SE AGREGO LA CANTIDAD DE SAINT PARA DISCRIMINAR UNITARIA  
+        # SE AGREGO LA CANTIDAD DE SAINT PARA DISCRIMINAR UNITARIAS  
         if config.params["init"]:
             cursor.execute(" SELECT a.Numerod as number, a.fechaT as date, a.id3 as client, (a.monto-a.descto1) as subtotal, a.mtoTax as tax, a.contado as total, b.codItem as product, count(b.codItem) as quantity, sum(b.cantidad) as qtPerItem, sum(b.totalItem) as tot from safact a , saitemfac b where a.tipoFac='A' and a.signo=1 and a.numeroD=b.numeroD and a.fechaT < \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\' group by a.Numerod, a.fechaT, a.id3, a.monto, a.mtoTax, a.contado, a.descto1, b.codItem order by a.Numerod")
         else:
@@ -207,7 +241,20 @@ def get_invoices(cursor,id_local):
         rows_0 = cursor.fetchall()
         if len(rows_0) > 0 :
 
-            logging.info("%d INVOICE RECORDS WILL BE SENT DURING THIS LOAD PROCESS",len(rows_0))
+
+            if config.params["init"]:
+                cursor.execute("SELECT count(*) as ct  from safact a  where a.tipoFac='A' and a.signo=1 and a.fechaT < \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\'")
+            else:
+                cursor.execute("SELECT count(*) as ct from safact a  where a.tipoFac='A' and a.signo=1 and a.fechaT >= \'"+config.params["time_init"].strftime("%Y-%m-%d %H:%M:%S") +"\'")
+            raux = cursor.fetchall()
+            n = int(getattr(raux[0],'ct'))
+            logging.info("%d INVOICE RECORDS WILL BE SENT DURING THIS LOAD PROCESS",n)
+            
+            qt = 0
+            pivote = 1
+            porcentaje = (100 // 20) * pivote
+            progreso = math.ceil(n / 20) * pivote
+            
 
             invoices = []
         
@@ -257,18 +304,25 @@ def get_invoices(cursor,id_local):
                 else:
                     
                     package = json.dumps(invoice, cls=DecimalEncoder)                
-                    response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
+                    response = sender(config.params["url"],config.params["port"],config.params["invoices"],package,auth)
                     
                     if(response == 600):
 
                         ri = 0
                         while(ri < 2 and response == 600):
 
-                            response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
+                            response = sender(config.params["url"],config.params["port"],config.params["invoices"],package,auth)
                             ri += 1
 
                     if not recover(response):
                         fail.append(invoice['number'])
+
+                    qt += 1
+                    if qt == progreso:
+                        update_progress(porcentaje, qt,n)
+                        pivote += 1
+                        porcentaje = (100 // 20) * pivote
+                        progreso = math.ceil(n / 20) * pivote
 
 
                     num_fact=getattr(rowitr,'number')
@@ -294,18 +348,25 @@ def get_invoices(cursor,id_local):
                     
                           
             package = json.dumps(invoice, cls=DecimalEncoder)  
-            response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
+            response = sender(config.params["url"],config.params["port"],config.params["invoices"],package,auth)
             
             if(response == 600):
 
                 ri = 0
                 while(ri < 2 and response == 600):
 
-                    response = sender(config.params["url"],config.params["port"],config.params["invoices"],package)
+                    response = sender(config.params["url"],config.params["port"],config.params["invoices"],package,auth)
                     ri += 1
 
             if not recover(response):
                 fail.append(invoice['number'])
+
+            qt += 1
+            if qt == progreso:
+                update_progress(porcentaje, qt,n)
+                pivote += 1
+                porcentaje = (100 // 20) * pivote
+                progreso = math.ceil(n / 20) * pivote
 
             
             return fail
@@ -321,7 +382,7 @@ def get_invoices(cursor,id_local):
         logging.error("SOMETHING WENT WRONG, EXCEPTION : [%s]",e)
         return None
 
-def get_del_invoices(cursor,id_local):
+def get_del_invoices(cursor,id_local,auth):
     
     try:
         if config.params["init"]:
@@ -360,7 +421,14 @@ def get_del_invoices(cursor,id_local):
         fail = []
         if len(rows) > 0 :
 
-            logging.info("%d DELETED INVOICE RECORDS WILL BE SENT DURING THIS LOAD PROCESS",len(rows))
+            n = len(rows)
+            qt = 0
+            pivote = 1
+            porcentaje = (100 // 20) * pivote
+            progreso = math.ceil(n / 20) * pivote
+            
+
+            logging.info("%d DELETED INVOICE RECORDS WILL BE SENT DURING THIS LOAD PROCESS",n)
 
             for row in rows:
 
@@ -378,7 +446,7 @@ def get_del_invoices(cursor,id_local):
                 invoices['local']=id_local
 
                 package = json.dumps(invoices, cls=DecimalEncoder)                
-                response = sender(config.params["url"],config.params["port"],config.params["cancelinvoices"],package)
+                response = sender(config.params["url"],config.params["port"],config.params["cancelinvoices"],package,auth)
 
 
                 if(response == 600):
@@ -386,11 +454,18 @@ def get_del_invoices(cursor,id_local):
                     ri = 0
                     while(ri < 2 and response == 600):
 
-                        response = sender(config.params["url"],config.params["port"],config.params["cancelinvoices"],package)
+                        response = sender(config.params["url"],config.params["port"],config.params["cancelinvoices"],package,auth)
                         ri += 1
 
                 if not recover(response):
                         fail.append(invoices['number'])
+
+                qt += 1
+                if qt == progreso:
+                    update_progress(porcentaje, qt,n)
+                    pivote += 1
+                    porcentaje = (100 // 20) * pivote
+                    progreso = math.ceil(n / 20) * pivote
 
                 
             return fail
@@ -406,18 +481,27 @@ def get_del_invoices(cursor,id_local):
         logging.error("SOMETHING WENT WRONG, EXCEPTION : [%s]",e)
         return None
 
-def time_updater():
-    if(config.params["init"]):
-        config.params["time_init"] = datetime.datetime.now() - datetime.timedelta(minutes=15)
-    else:
-        config.params["time_load"] = datetime.datetime.now() - datetime.timedelta(minutes=15)
 
-def time_swap():
-    if not (config.params["init"]):
-        config.params["time_init"]=config.params["time_load"]
+def login(user,passw,id_local):
+
+    authOb = {}
+    authOb['email'] = user
+    authOb['password'] = passw
+
+    package = json.dumps(authOb,cls=DecimalEncoder)
+    #print(package)
+    obj = senderBody(config.params["url"],config.params["port"],config.params["login"],package)
+
+    if isinstance(obj,int):
+         logging.error("COULD NOT CONNECT TO API, AUTH FAILURE, CODE [%s] ",obj)
     else:
-        config.params["init"]=0
-   
+        obj['X-COIN'] = obj.pop('token')
+        obj.pop('roles')
+        obj.pop('locals')
+        obj['ID'] = id_local
+
+    return obj
+
 def make_connection(config_db):
     try:
         logging.debug("DATABASE CONNECTION OPENED")
@@ -441,12 +525,15 @@ def close_connection(cursor):
         logging.error('SOMETHING WENT WRONG: [%s]',e) 
         cursor=None      
 
-def sender(url,port,endpoint,json):
+
+def sender(url,port,endpoint,jsonS,headersD):
     try:
-        if not json == None:
-            post_data =json.encode('utf-8')
+        if not jsonS == None:
+            post_data =jsonS.encode('utf-8')
             headers = { 'Content-type': "application/json",
                         'Accept': "application/json"}
+
+            headers.update(headersD)
             request = urllib.request.Request(url+':'+port+endpoint, data=post_data, headers=headers)
             body = urllib.request.urlopen(request)
         else:
@@ -455,8 +542,13 @@ def sender(url,port,endpoint,json):
         response = 0
     
     except urllib.error.HTTPError as e: 
-        logging.debug("COULD NOT SEND OBJECT, CODE: %s REASON: %s, BODY: %s",e.getcode(),e.reason,e.read().decode('utf8','ignore'))
-        response = e.getcode()
+        if e.getcode() == 403:
+            logging.debug("COULD NOT SEND OBJECT, CODE: 403, REASON: UNFORBIDDEN")
+            response = e.getcode()    
+        else:
+            logging.debug("COULD NOT SEND OBJECT, CODE: %s REASON: %s, BODY: %s",e.getcode(),e.reason,e.read().decode('utf8','ignore'))
+            response = e.getcode()
+
     except urllib.error.URLError as e: 
         logging.error("COULD NOT SEND OBJECT, REASON: %s",e.reason)
         response = 600
@@ -467,13 +559,54 @@ def sender(url,port,endpoint,json):
     
     return response
 
+
+
+def senderBody(url,port,endpoint,jsonS):
+    try:
+        if not jsonS == None:
+            post_data =jsonS.encode('utf-8')
+            headers = { 'Content-type': "application/json",
+                        'Accept': "application/json"}
+            request = urllib.request.Request(url+':'+port+endpoint, data=post_data, headers=headers)
+            body = urllib.request.urlopen(request)
+        else:
+            logging.debug("THERE WAS NOTHING TO SEND IN THIS REQUEST")
+
+        str_response = body.readall().decode('utf-8')
+
+        if str_response == "":
+            response = 0
+        else:
+            response =  json.loads(str_response)
+    
+    except urllib.error.HTTPError as e: 
+        logging.debug("COULD NOT SEND OBJECT, CODE: %s REASON: %s, BODY: %s",e.getcode(),e.reason,e.read().decode('utf8','ignore'))
+        response = e.getcode()
+
+    except urllib.error.URLError as e: 
+        logging.error("COULD NOT SEND OBJECT, REASON: %s",e.reason)
+        response = 600
+    except Exception as e:
+        logging.error('THERE IS SOMETHING WRONG: [%s]',e)
+        response = 601
+        
+    
+    return response
+
+
 def setConfiguration():
 
+    pp = pprint.PrettyPrinter(indent=4)
     f= open('config.py','w')
     f.write('import datetime \n')
-    f.write('local ='+str(local.local)+'\n')
-    f.write('configs ='+str(local.configs)+'\n')
-    f.write('params =' +str(config.params)+'\n')
+    ppaux = pp.pformat(config.params)
+    f.write('params =' +ppaux+'\n')
+    f.close()
+    f= open('local.py','w')
+    ppaux = pp.pformat(local.local)
+    f.write('local ='+ppaux+'\n')
+    ppaux = pp.pformat(local.configs)
+    f.write('configs ='+ppaux+'\n')
     f.close()
     logging.debug("CONFIGURATION WAS SAVED")
 
@@ -496,6 +629,22 @@ def setLogs():
 
     logging.basicConfig(level='DEBUG',handlers=[fh,rh,efh],format=formatStr)
    
+
+def time_updater():
+    if(config.params["init"]):
+        config.params["time_init"] = datetime.datetime.now() - datetime.timedelta(minutes=15)
+    else:
+        config.params["time_load"] = datetime.datetime.now() - datetime.timedelta(minutes=15)
+
+def time_swap():
+    if not (config.params["init"]):
+        config.params["time_init"]=config.params["time_load"]
+    else:
+        config.params["init"]=0
+   
+
+
+
 def main():
     
     
@@ -511,17 +660,19 @@ def main():
     # SE ESTABLECE LA CONEXION CON EL SERVIDOR DE BASE DE DATOS
     cursor=make_connection(local.configs)
 
+    auth = login(username,password,local.local['id'])
+
     # EN CASO DE QUE LA CONEXION CON LA BD SEA EXITOSA
-    if not cursor == None:
+    if not cursor == None and not isinstance(auth,int):
         
         # SE TOMA LA HORA QUE FUNCIONARA DE PIVOTE 
         time_updater()
 
         # SE EJECUTAN LAS CONSULTAS CORRESPONDIENTES
-        data_0 = get_products(cursor,local.local['id'])
-        data_1 = get_clients(cursor,local.local['id'],config.params['no_id'])
-        data_2 = get_invoices(cursor,local.local['id'])
-        data_3 = get_del_invoices(cursor,local.local['id'])
+        data_0 = get_products(cursor,local.local['id'],auth)
+        data_1 = get_clients(cursor,local.local['id'],config.params['no_id'],auth)
+        data_2 = get_invoices(cursor,local.local['id'],auth)
+        data_3 = get_del_invoices(cursor,local.local['id'],auth)
         #print(data_0)
         #print(data_1)
         #print(data_2)
